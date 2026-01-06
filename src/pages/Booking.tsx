@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, CreditCard, Check, MapPin, Trophy, Star } from 'lucide-react';
+import { BookingSelectionSchema, PaymentSchema, sanitizeString } from '../utils/validation';
 
 const Booking = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -8,6 +9,15 @@ const Booking = () => {
   const [selectedTime, setSelectedTime] = useState('');
   const [ticketQuantity, setTicketQuantity] = useState(1);
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Payment form state (kept client-side only; never store raw card data on the server)
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [cardName, setCardName] = useState("");
+
+  // Simple client-side validation errors
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsVisible(true);
@@ -70,15 +80,52 @@ const Booking = () => {
   };
 
   const nextStep = () => {
+    setFormError(null);
+    if (currentStep === 1) {
+      // Validate selection step
+      const data = { eventId: selectedEvent, date: selectedDate, time: selectedTime, ticketQuantity };
+      const parsed = BookingSelectionSchema.safeParse(data);
+      if (!parsed.success) {
+        setFormError('Please select an event, date, time, and ticket quantity within allowed limits.');
+        return;
+      }
+    }
+
     if (currentStep < 4) {
       setCurrentStep(currentStep + 1);
     }
   };
 
   const prevStep = () => {
+    setFormError(null);
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
+  };
+
+  const handleComplete = () => {
+    setFormError(null);
+
+    // Client-side validation for payment details
+    const payment = {
+      cardNumber: sanitizeString(cardNumber).replace(/\s+/g, ''),
+      expiry: sanitizeString(expiry),
+      cvv: sanitizeString(cvv),
+      name: sanitizeString(cardName),
+    };
+
+    const parsed = PaymentSchema.safeParse(payment);
+    if (!parsed.success) {
+      setFormError('Invalid payment details. Please check card fields.');
+      return;
+    }
+
+    // At this point we would call the server-side endpoint to process booking/tokenize card.
+    // Do NOT send raw card data to your application server unless you're PCI compliant. Instead,
+    // integrate with a payment processor's client-side tokenization (Stripe Elements, etc.),
+    // and send only the token to the server.
+
+    alert('Booking completed!');
   };
 
   return (
@@ -317,7 +364,11 @@ const Booking = () => {
                       <label className="block text-gray-400 mb-2">Card Number</label>
                       <input
                         type="text"
+                        inputMode="numeric"
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value)}
                         placeholder="1234 5678 9012 3456"
+                        maxLength={23}
                         className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-cyan-400"
                       />
                     </div>
@@ -326,7 +377,10 @@ const Booking = () => {
                         <label className="block text-gray-400 mb-2">Expiry Date</label>
                         <input
                           type="text"
+                          value={expiry}
+                          onChange={(e) => setExpiry(e.target.value)}
                           placeholder="MM/YY"
+                          maxLength={5}
                           className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-cyan-400"
                         />
                       </div>
@@ -334,7 +388,11 @@ const Booking = () => {
                         <label className="block text-gray-400 mb-2">CVV</label>
                         <input
                           type="text"
+                          inputMode="numeric"
+                          value={cvv}
+                          onChange={(e) => setCvv(e.target.value)}
                           placeholder="123"
+                          maxLength={4}
                           className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-cyan-400"
                         />
                       </div>
@@ -343,7 +401,10 @@ const Booking = () => {
                       <label className="block text-gray-400 mb-2">Cardholder Name</label>
                       <input
                         type="text"
+                        value={cardName}
+                        onChange={(e) => setCardName(e.target.value)}
                         placeholder="John Doe"
+                        maxLength={100}
                         className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-cyan-400"
                       />
                     </div>
@@ -367,17 +428,20 @@ const Booking = () => {
               Previous
             </button>
             
-            <button
-              onClick={currentStep === 4 ? () => alert('Booking completed!') : nextStep}
-              disabled={
-                (currentStep === 1 && !selectedEvent) ||
-                (currentStep === 2 && (!selectedDate || !selectedTime)) ||
-                (currentStep === 3 && ticketQuantity === 0)
-              }
-              className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-purple-500 text-white font-bold rounded-full hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/25 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            >
-              {currentStep === 4 ? 'Complete Booking' : 'Next'}
-            </button>
+            <div className="flex items-center gap-4">
+              {formError && <div className="text-sm text-red-400">{formError}</div>}
+              <button
+                onClick={currentStep === 4 ? handleComplete : nextStep}
+                disabled={
+                  (currentStep === 1 && !selectedEvent) ||
+                  (currentStep === 2 && (!selectedDate || !selectedTime)) ||
+                  (currentStep === 3 && ticketQuantity === 0)
+                }
+                className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-purple-500 text-white font-bold rounded-full hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/25 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                {currentStep === 4 ? 'Complete Booking' : 'Next'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

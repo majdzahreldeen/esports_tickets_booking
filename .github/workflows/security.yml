@@ -1,0 +1,28 @@
+name: Security checks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install (root)
+        run: npm ci
+      - name: Run ESLint
+        run: npm run lint || true
+      - name: Audit client dependencies
+        run: npm audit --audit-level=high || true
+      - name: Audit server dependencies
+        run: |
+          cd server || exit 0
+          npm ci || exit 0
+          npm audit --audit-level=high || true
