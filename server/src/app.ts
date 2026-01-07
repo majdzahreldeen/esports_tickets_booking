@@ -24,6 +24,15 @@ app.use(rateLimiter);
 // Example namespaced API route
 app.use("/api/example", exampleRouter);
 
+// Events, bookings and shop routes
+import { eventsRouter } from "./routes/events";
+import { bookingsRouter } from "./routes/bookings";
+import { shopRouter } from "./routes/shop";
+
+app.use("/api/events", eventsRouter);
+app.use("/api/bookings", bookingsRouter);
+app.use("/api/shop", shopRouter);
+
 // Error handling middleware should be last
 app.use(errorHandler);
 
